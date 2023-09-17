@@ -1,0 +1,14 @@
+# package directories
+node_modules
+jspm_packages
+
+# Serverless directories
+.serverless
+
+# Config and test files
+# config/config.json
+config/config.json
+static/js/defaults-*
+static/img/logoHE.png
+sample_post*.json
+test*

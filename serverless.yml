@@ -1,0 +1,76 @@
+service: sls-s3-msi
+
+frameworkVersion: "3"
+
+# Packaging information
+package:
+ patterns:
+  - '!README.md'
+  - '!LICENSE'
+  - '!resources/**'
+  - '!static/**'
+  - '!exiftool/**'
+  - '!config/**'
+
+custom:
+  stage: ${opt:stage, "dev1"}
+  config: ${file(./config/config.json):${self:custom.stage}}
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  memorySize: 128
+  timeout: 600
+  stage: ${self:custom.stage}
+  region: us-east-1
+  # IAM roles
+  iam:
+    role:
+      statements:
+        # Grant access to S3 to get attributes, copy objects, and get objects.
+        - Effect: "Allow"
+          Action:
+            - "s3:ListBucket"
+            - "s3:GetBucketLocation"
+            - "s3:PutObject"
+            - "s3:GetObject"
+            - "s3:GetObjectAttributes"
+            - "s3:GetObjectVersion"
+            - "s3:GetObjectVersionAttributes"
+          Resource: arn:aws:s3:::${self:custom.config.bucket}*
+        # Grant access to SES
+        - Effect: "Allow"
+          Action:
+            - "ses:SendEmail"
+            - "ses:SendRawEmail"
+          Resource: ${self:custom.config.sesarn}
+
+layers:
+  commonModules:
+    path: layers/CommonModules
+    compatibleRuntimes:
+      - nodejs18.x
+    name: ${self:provider.stage}-s3-msi-CommonModules
+    description: "p-exiftool mimetext"
+
+functions:
+  msiProcessor:
+    handler: lambdas/msiProcessor.handler
+    description: "Triggered by S3 when objects are uploaded to /msi folder"
+    layers:
+      - {Ref: CommonModulesLambdaLayer}
+      - arn:aws:lambda:us-east-1:445285296882:layer:perl-5-38-runtime-al2-x86_64:4
+      - arn:aws:lambda:us-east-1:089264813663:layer:exiftool:1
+    events:
+      - s3:
+          bucket: ${self:custom.config.bucket}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: msi/
+          existing: true
+    environment:
+      KEYPAIRID: ${self:custom.config.keypairId}
+      PRIVATEKEY: ${self:custom.config.privatekey}
+      EXPDN: ${self:custom.config.expdn}
+      SENDER: ${self:custom.config.sender}
+      RECEIVER: ${self:custom.config.receiver}
