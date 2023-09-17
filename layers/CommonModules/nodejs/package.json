@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "mimetext": "^3.0.16",
+    "p-exiftool": "^1.0.1"
+  }
+}
